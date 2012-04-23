@@ -22,6 +22,9 @@
 #include "private-libwebsockets.h"
 
 #ifdef WIN32
+typedef int              pid_t;	 
+typedef SSIZE_T          ssize_t;
+typedef unsigned int     uint;
 
 #else
 #include <ifaddrs.h>
@@ -30,6 +33,14 @@
 
 #ifdef LWS_OPENSSL_SUPPORT
 int openssl_websocket_private_data_index;
+#endif
+
+#ifdef __MINGW32__
+#include "../win32port/win32helpers/websock-w32.c"
+#else
+#ifdef __MINGW64__
+#include "../win32port/win32helpers/websock-w32.c"
+#endif
 #endif
 
 /*
@@ -383,7 +394,7 @@ just_kill_connection:
 #ifdef LWS_OPENSSL_SUPPORT
 	}
 #endif
-	if (wsi->user_space)
+	if (wsi->protocol && wsi->protocol->per_session_data_size && wsi->user_space) /* user code may own */
 		free(wsi->user_space);
 
 	free(wsi);
@@ -1190,7 +1201,7 @@ select_protocol:
 		 * default to first protocol
 		 */
 		wsi->protocol = &context->protocols[0];
-
+		wsi->c_callback = wsi->protocol->callback;
 		free(wsi->c_protocol);
 
 		goto check_accept;
@@ -1227,10 +1238,12 @@ select_protocol:
 	 */
 	n = 0;
 	wsi->protocol = NULL;
-	while (context->protocols[n].callback) {
+	while (context->protocols[n].callback && !wsi->protocol) {  /* Stop after finding first one?? */
 		if (strcmp(wsi->utf8_token[WSI_TOKEN_PROTOCOL].token,
-					   context->protocols[n].name) == 0)
+					   context->protocols[n].name) == 0) {
 			wsi->protocol = &context->protocols[n];
+			wsi->c_callback = wsi->protocol->callback;
+		}
 		n++;
 	}
 
@@ -1384,7 +1397,7 @@ accept_ok:
 	wsi->state = WSI_STATE_ESTABLISHED;
 	wsi->mode = LWS_CONNMODE_WS_CLIENT;
 
-	fprintf(stderr, "handshake OK for protocol %s\n", wsi->protocol->name);
+	debug("handshake OK for protocol %s\n", wsi->protocol->name);
 
 	/* call him back to inform him he is up */
 
@@ -1417,8 +1430,13 @@ bail3:
 		free(wsi->c_protocol);
 
 bail2:
+	if (wsi->c_callback) wsi->c_callback(context, wsi,
+       LWS_CALLBACK_CLIENT_CONNECTION_ERROR,
+			 wsi->user_space,
+			 NULL, 0);
 	libwebsocket_close_and_free_session(context, wsi,
-						 LWS_CLOSE_STATUS_NOSTATUS);
+						 LWS_CLOSE_STATUS_NOSTATUS);  // But this should be LWS_CLOSE_STATUS_PROTOCOL_ERR
+
 	return 1;
 }
 
@@ -2839,8 +2857,7 @@ libwebsocket_create_context(int port, const char *interf,
 			protocols[context->count_protocols].callback;
 						   context->count_protocols++) {
 
-		fprintf(stderr, "  Protocol: %s\n",
-				     protocols[context->count_protocols].name);
+		debug("  Protocol: %s\n", protocols[context->count_protocols].name);
 
 		protocols[context->count_protocols].owning_server = context;
 		protocols[context->count_protocols].protocol_index =
@@ -2916,7 +2933,7 @@ libwebsocket_create_context(int port, const char *interf,
 	if (port)
 		m = LWS_EXT_CALLBACK_SERVER_CONTEXT_CONSTRUCT;
 	while (extensions->callback) {
-		fprintf(stderr, "  Extension: %s\n", extensions->name);
+		debug("  Extension: %s\n", extensions->name);
 		extensions->callback(context, extensions,
 							NULL, m, NULL, NULL, 0);
 		extensions++;
