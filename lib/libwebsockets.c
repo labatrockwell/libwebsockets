@@ -1807,7 +1807,7 @@ libwebsocket_service_fd(struct libwebsocket_context *context,
 
 			n = SSL_get_verify_result(wsi->ssl);
 			if ((n != X509_V_OK) && (
-				n != X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT ||
+				(n != X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT && n != X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN) ||
 							   wsi->use_ssl != 2)) {
 
 				fprintf(stderr, "server's cert didn't "
