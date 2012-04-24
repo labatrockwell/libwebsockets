@@ -1,6 +1,4 @@
 #include "private-libwebsockets.h"
-#include <netdb.h>
-
 
 struct libwebsocket *__libwebsocket_client_connect_2(
 	struct libwebsocket_context *context,
@@ -243,13 +241,32 @@ libwebsocket_client_connect(struct libwebsocket_context *context,
 	} else
 		wsi->c_origin = NULL;
 
+	wsi->c_callback = NULL;
 	if (protocol) {
+		const char *pc;
+		struct libwebsocket_protocols *pp;
+
 		wsi->c_protocol = malloc(strlen(protocol) + 1);
 		if (wsi->c_protocol == NULL)
 			goto oom3;
+
 		strcpy(wsi->c_protocol, protocol);
+
+		pc = protocol;
+		while (*pc && *pc != ',')
+			pc++;
+		n = pc - protocol;
+		pp = context->protocols;
+		while (pp->name && !wsi->c_callback) {
+			if (!strncmp(protocol, pp->name, n))
+				wsi->c_callback = pp->callback;
+			pp++;
+		}
 	} else
 		wsi->c_protocol = NULL;
+
+	if (!wsi->c_callback)
+		wsi->c_callback = context->protocols[0].callback;
 
 	/* set up appropriate masking */
 
@@ -341,3 +358,45 @@ bail1:
 
 	return NULL;
 }
+
+
+/**
+ * libwebsocket_client_connect_extended() - Connect to another websocket server
+ * @context:	Websocket context
+ * @address:	Remote server address, eg, "myserver.com"
+ * @port:	Port to connect to on the remote server, eg, 80
+ * @ssl_connection:	0 = ws://, 1 = wss:// encrypted, 2 = wss:// allow self
+ *			signed certs
+ * @path:	Websocket path on server
+ * @host:	Hostname on server
+ * @origin:	Socket origin name
+ * @protocol:	Comma-separated list of protocols being asked for from
+ *		the server, or just one.  The server will pick the one it
+ *		likes best.
+ * @ietf_version_or_minus_one: -1 to ask to connect using the default, latest
+ * 		protocol supported, or the specific protocol ordinal
+ * @userdata: Pre-allocated user data
+ *
+ *	This function creates a connection to a remote server
+ */
+
+struct libwebsocket *
+libwebsocket_client_connect_extended(struct libwebsocket_context *context,
+			      const char *address,
+			      int port,
+			      int ssl_connection,
+			      const char *path,
+			      const char *host,
+			      const char *origin,
+			      const char *protocol,
+			      int ietf_version_or_minus_one,
+            void *userdata)
+{
+	struct libwebsocket *ws =
+		libwebsocket_client_connect(context, address, port, ssl_connection, path, host, origin, protocol, ietf_version_or_minus_one) ;
+
+	if (ws && !ws->user_space && userdata)
+		ws->user_space = userdata ;
+
+	return ws ;
+  }
