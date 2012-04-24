@@ -245,13 +245,13 @@ libwebsockets_test_server_extpoll_SOURCES = test-server-extpoll.c
 libwebsockets_test_server_extpoll_LDADD = -L../lib -lwebsockets
 libwebsockets_test_fraggle_SOURCES = test-fraggle.c
 libwebsockets_test_fraggle_LDADD = -L../lib -lwebsockets
-libwebsockets_test_server_CFLAGS := -Wall -Werror -std=gnu99 -pedantic -DDATADIR=\"@datadir@\" -DLWS_OPENSSL_CLIENT_CERTS=\"@clientcertdir@\"
-libwebsockets_test_client_CFLAGS := -Wall -Werror -std=gnu99 -pedantic -DDATADIR=\"@datadir@\" -DLWS_OPENSSL_CLIENT_CERTS=\"@clientcertdir@\"
-libwebsockets_test_server_extpoll_CFLAGS := -Wall -Werror -std=gnu99 -pedantic -DDATADIR=\"@datadir@\" -DLWS_OPENSSL_CLIENT_CERTS=\"@clientcertdir@\"
-libwebsockets_test_fraggle_CFLAGS := -Wall -Werror -std=gnu99 -pedantic -DDATADIR=\"@datadir@\" -DLWS_OPENSSL_CLIENT_CERTS=\"@clientcertdir@\"
+libwebsockets_test_server_CFLAGS := -Wall -Werror -std=gnu99 -pedantic -DINSTALL_DATADIR=\"@datadir@\" -DLWS_OPENSSL_CLIENT_CERTS=\"@clientcertdir@\"
+libwebsockets_test_client_CFLAGS := -Wall -Werror -std=gnu99 -pedantic -DINSTALL_DATADIR=\"@datadir@\" -DLWS_OPENSSL_CLIENT_CERTS=\"@clientcertdir@\"
+libwebsockets_test_server_extpoll_CFLAGS := -Wall -Werror -std=gnu99 -pedantic -DINSTALL_DATADIR=\"@datadir@\" -DLWS_OPENSSL_CLIENT_CERTS=\"@clientcertdir@\"
+libwebsockets_test_fraggle_CFLAGS := -Wall -Werror -std=gnu99 -pedantic -DINSTALL_DATADIR=\"@datadir@\" -DLWS_OPENSSL_CLIENT_CERTS=\"@clientcertdir@\"
 @NOPING_FALSE@libwebsockets_test_ping_SOURCES = test-ping.c
 @NOPING_FALSE@libwebsockets_test_ping_LDADD = -L../lib -lwebsockets
-@NOPING_FALSE@libwebsockets_test_ping_CFLAGS := -Wall -Werror -std=gnu99 -pedantic -DDATADIR=\"@datadir@\" -DLWS_OPENSSL_CLIENT_CERTS=\"@clientcertdir@\"
+@NOPING_FALSE@libwebsockets_test_ping_CFLAGS := -Wall -Werror -std=gnu99 -pedantic -DINSTALL_DATADIR=\"@datadir@\" -DLWS_OPENSSL_CLIENT_CERTS=\"@clientcertdir@\"
 all: all-am
 
 .SUFFIXES:
