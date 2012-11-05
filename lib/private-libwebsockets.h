@@ -56,7 +56,9 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #ifndef LWS_NO_FORK
+#ifdef HAVE_SYS_PRCTL_H
 #include <sys/prctl.h>
+#endif
 #endif
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -118,10 +120,10 @@ void debug(const char *format, ...)
 #define FD_HASHTABLE_MODULUS 32
 #define MAX_CLIENTS 100
 #define LWS_MAX_HEADER_NAME_LENGTH 64
-#define LWS_MAX_HEADER_LEN 4096
+#define LWS_MAX_HEADER_LEN 8192
 #define LWS_INITIAL_HDR_ALLOC 256
 #define LWS_ADDITIONAL_HDR_ALLOC 64
-#define MAX_USER_RX_BUFFER 4096
+#define MAX_USER_RX_BUFFER 8192
 #define MAX_BROADCAST_PAYLOAD 2048
 #define LWS_MAX_PROTOCOLS 10
 #define LWS_MAX_EXTENSIONS_ACTIVE 10
@@ -256,6 +258,8 @@ struct libwebsocket_context {
 	struct libwebsocket_protocols *protocols;
 	int count_protocols;
 	struct libwebsocket_extension *extensions;
+
+    void *user_space;
 };
 
 
