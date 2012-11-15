@@ -7,11 +7,12 @@ dist_libwebsockets_la_SOURCES=libwebsockets.c \
 				base64-decode.c \
 				client-handshake.c \
 				extension.c \
-				extension-deflate-stream.c \
+				extension-deflate-stream.c extension-deflate-stream.h \
 				private-libwebsockets.h
-				
+
+
 if EXT_GOOGLE_MUX
-dist_libwebsockets_la_SOURCES += extension-x-google-mux.c
+dist_libwebsockets_la_SOURCES += extension-x-google-mux.c extension-x-google-mux.h
 endif
 
 if LIBCRYPTO
@@ -19,9 +20,20 @@ else
 dist_libwebsockets_la_SOURCES += md5.c sha-1.c
 endif
 
-libwebsockets_la_CFLAGS:=-rdynamic -fPIC -Wall -Werror -std=gnu99 -pedantic -c \
+libwebsockets_la_CFLAGS=-Wall -std=gnu99 -pedantic
+libwebsockets_la_LDFLAGS=
+
+if MINGW
+libwebsockets_la_CFLAGS+= -w -I../win32port/win32helpers -I ../win32port/zlib/
+libwebsockets_la_LDFLAGS+= -lm -luser32 -ladvapi32 -lkernel32 -lgcc
+else
+libwebsockets_la_CFLAGS+= -rdynamic -fPIC -Werror
+libwebsockets_la_LDFLAGS+=  -version-info 0:3
+endif
+
+libwebsockets_la_CFLAGS+= -c \
 	-DINSTALL_DATADIR=\"@datadir@\" -DLWS_OPENSSL_CLIENT_CERTS=\"@clientcertdir@\"
-libwebsockets_la_LDFLAGS=-lz -version-info 0:3
+libwebsockets_la_LDFLAGS+= -lz
 
 all-local:
 	 ../scripts/kernel-doc -html \

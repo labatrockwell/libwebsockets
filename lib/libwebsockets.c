@@ -22,13 +22,12 @@
 #include "private-libwebsockets.h"
 
 #ifdef WIN32
-typedef int              pid_t;	 
-typedef SSIZE_T          ssize_t;
-typedef unsigned int     uint;
 
 #else
 #include <ifaddrs.h>
 #include <sys/un.h>
+#include <sys/socket.h>
+#include <netdb.h>
 #endif
 
 #ifdef LWS_OPENSSL_SUPPORT
@@ -1509,7 +1508,7 @@ libwebsocket_service_fd(struct libwebsocket_context *context,
 	wsi = wsi_from_fd(context, pollfd->fd);
 
 	if (wsi == NULL)
-		return 1;
+		return 0;
 
 	switch (wsi->mode) {
 	case LWS_CONNMODE_SERVER_LISTENER:
@@ -1530,8 +1529,8 @@ libwebsocket_service_fd(struct libwebsocket_context *context,
 		accept_fd  = accept(pollfd->fd, (struct sockaddr *)&cli_addr,
 								       &clilen);
 		if (accept_fd < 0) {
-			fprintf(stderr, "ERROR on accept");
-			break;
+			debug("ERROR on accept\n");
+			return -1;
 		}
 
 		/* Disable Nagle */
@@ -1642,8 +1641,8 @@ libwebsocket_service_fd(struct libwebsocket_context *context,
 		accept_fd  = accept(pollfd->fd, (struct sockaddr *)&cli_addr,
 								       &clilen);
 		if (accept_fd < 0) {
-			fprintf(stderr, "ERROR on accept");
-			break;
+			debug("ERROR on accept\n");
+			return -1;
 		}
 
 		if (context->fds_count >= MAX_CLIENTS) {
@@ -1803,7 +1802,7 @@ libwebsocket_service_fd(struct libwebsocket_context *context,
 	case LWS_CONNMODE_WS_CLIENT_ISSUE_HANDSHAKE:
 
 	#ifdef LWS_OPENSSL_SUPPORT
-		if (wsi->use_ssl) {
+		if (wsi->use_ssl && !wsi->ssl) {
 
 			wsi->ssl = SSL_new(context->ssl_client_ctx);
 			wsi->client_bio = BIO_new_socket(wsi->sock,
@@ -1813,19 +1812,25 @@ libwebsocket_service_fd(struct libwebsocket_context *context,
 			SSL_set_ex_data(wsi->ssl,
 					openssl_websocket_private_data_index,
 								       context);
+		}		
 
+		if (wsi->use_ssl) {
 			if (SSL_connect(wsi->ssl) <= 0) {
+
+				/*
+				 * retry if new data comes until we
+				 * run into the connection timeout or win
+				 */
+
 				fprintf(stderr, "SSL connect error %s\n",
 					ERR_error_string(ERR_get_error(),
 								  ssl_err_buf));
-				libwebsocket_close_and_free_session(context,
-					       wsi, LWS_CLOSE_STATUS_NOSTATUS);
-				return 1;
+				return 0;
 			}
 
 			n = SSL_get_verify_result(wsi->ssl);
 			if ((n != X509_V_OK) && (
-				(n != X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT && n != X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN) ||
+				n != X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT ||
 							   wsi->use_ssl != 2)) {
 
 				fprintf(stderr, "server's cert didn't "
@@ -1834,13 +1839,8 @@ libwebsocket_service_fd(struct libwebsocket_context *context,
 						wsi, LWS_CLOSE_STATUS_NOSTATUS);
 				return 1;
 			}
-		} else {
+		} else
 			wsi->ssl = NULL;
-	#endif
-
-
-	#ifdef LWS_OPENSSL_SUPPORT
-		}
 	#endif
 
 		p = libwebsockets_generate_client_handshake(context, wsi, p);
@@ -1993,7 +1993,7 @@ bail3:
 		if (eff_buf.token_len < 0) {
 			fprintf(stderr, "Socket read returned %d\n",
 							    eff_buf.token_len);
-			if (errno != EINTR)
+			if (errno != EINTR && errno != EAGAIN)
 				libwebsocket_close_and_free_session(context,
 					       wsi, LWS_CLOSE_STATUS_NOSTATUS);
 			return 1;
@@ -2001,7 +2001,7 @@ bail3:
 		if (!eff_buf.token_len) {
 			libwebsocket_close_and_free_session(context, wsi,
 						    LWS_CLOSE_STATUS_NOSTATUS);
-			return 1;
+			return 0;
 		}
 
 		/*
@@ -2094,7 +2094,7 @@ libwebsocket_context_destroy(struct libwebsocket_context *context)
 	m = LWS_EXT_CALLBACK_CLIENT_CONTEXT_DESTRUCT;
 	if (context->listen_port)
 		m = LWS_EXT_CALLBACK_SERVER_CONTEXT_DESTRUCT;
-	while (ext->callback) {
+	while (ext && ext->callback) {
 		ext->callback(context, ext, NULL, m, NULL, NULL, 0);
 		ext++;
 	}
@@ -2116,6 +2116,12 @@ libwebsocket_context_destroy(struct libwebsocket_context *context)
 #ifdef WIN32
 	WSACleanup();
 #endif
+}
+
+LWS_EXTERN void *
+libwebsocket_context_user(struct libwebsocket_context *context)
+{
+    return context->user_space;
 }
 
 /**
@@ -2174,15 +2180,16 @@ libwebsocket_service(struct libwebsocket_context *context, int timeout_ms)
 		/*
 		fprintf(stderr, "Listen Socket dead\n");
 		*/
-		return 1;
+		return -1;
 	}
 
 	/* handle accept on listening socket? */
 
 	for (n = 0; n < context->fds_count; n++)
 		if (context->fds[n].revents)
-			libwebsocket_service_fd(context, &context->fds[n]);
-
+			if (libwebsocket_service_fd(context,
+							&context->fds[n]) < 0)
+				return -1;
 	return 0;
 }
 
@@ -2470,6 +2477,8 @@ OpenSSL_verify_callback(int preverify_ok, X509_STORE_CTX *x509_ctx)
  * @gid:	group id to change to after setting listen socket, or -1.
  * @uid:	user id to change to after setting listen socket, or -1.
  * @options:	0, or LWS_SERVER_OPTION_DEFEAT_CLIENT_MASK
+ * @user:	optional user pointer that can be recovered via the context
+ * 		pointer using libwebsocket_context_user 
  *
  *	This function creates the listening socket and takes care
  *	of all initialization in one step.
@@ -2503,7 +2512,8 @@ libwebsocket_create_context(int port, const char *interf,
 			       struct libwebsocket_extension *extensions,
 			       const char *ssl_cert_filepath,
 			       const char *ssl_private_key_filepath,
-			       int gid, int uid, unsigned int options)
+			       int gid, int uid, unsigned int options,
+                   void *user)
 {
 	int n;
 	int m;
@@ -2514,9 +2524,10 @@ libwebsocket_create_context(int port, const char *interf,
 	struct libwebsocket_context *context = NULL;
 	unsigned int slen;
 	char *p;
-	char hostname[1024];
-	struct hostent *he;
+	char hostname[1024] = "";
+//	struct hostent *he;
 	struct libwebsocket *wsi;
+	struct sockaddr sa;
 
 #ifdef LWS_OPENSSL_SUPPORT
 	SSL_METHOD *method;
@@ -2565,6 +2576,8 @@ libwebsocket_create_context(int port, const char *interf,
 	context->options = options;
 	context->fds_count = 0;
 	context->extensions = extensions;
+	context->last_timeout_check_s = 0;
+    context->user_space = user;
 
 #ifdef WIN32
 	context->fd_random = 0;
@@ -2583,19 +2596,42 @@ libwebsocket_create_context(int port, const char *interf,
 	context->ssl_client_ctx = NULL;
 	openssl_websocket_private_data_index = 0;
 #endif
-	/* find canonical hostname */
 
-	hostname[(sizeof hostname) - 1] = '\0';
-	gethostname(hostname, (sizeof hostname) - 1);
-	he = gethostbyname(hostname);
-	if (he) {
-		strncpy(context->canonical_hostname, he->h_name,
-					sizeof context->canonical_hostname - 1);
-		context->canonical_hostname[
-				sizeof context->canonical_hostname - 1] = '\0';
-	} else
-		strncpy(context->canonical_hostname, hostname,
-					sizeof context->canonical_hostname - 1);
+	if (options & LWS_SERVER_OPTION_SKIP_SERVER_CANONICAL_NAME) {
+
+		strcpy(context->canonical_hostname, "unknown");
+
+	} else {
+
+		/* find canonical hostname */
+
+		hostname[(sizeof hostname) - 1] = '\0';
+		memset(&sa, 0, sizeof(sa));
+		sa.sa_family = AF_INET;
+		sa.sa_data[(sizeof sa.sa_data) - 1] = '\0';
+		gethostname(hostname, (sizeof hostname) - 1);
+
+		n = 0;
+
+		if (strlen(hostname) < sizeof(sa.sa_data) - 1) {	
+			strcpy(sa.sa_data, hostname);
+	//		fprintf(stderr, "my host name is %s\n", sa.sa_data);
+			n = getnameinfo(&sa, sizeof(sa), hostname,
+				(sizeof hostname) - 1, NULL, 0, 0);
+		}
+
+		if (!n) {
+			strncpy(context->canonical_hostname, hostname,
+						sizeof context->canonical_hostname - 1);
+			context->canonical_hostname[
+					sizeof context->canonical_hostname - 1] = '\0';
+		} else
+			strncpy(context->canonical_hostname, hostname,
+						sizeof context->canonical_hostname - 1);
+
+	//	fprintf(stderr, "context->canonical_hostname = %s\n",
+	//						context->canonical_hostname);
+	}
 
 	/* split the proxy ads:port if given */
 
@@ -2932,11 +2968,14 @@ libwebsocket_create_context(int port, const char *interf,
 	m = LWS_EXT_CALLBACK_CLIENT_CONTEXT_CONSTRUCT;
 	if (port)
 		m = LWS_EXT_CALLBACK_SERVER_CONTEXT_CONSTRUCT;
-	while (extensions->callback) {
-		debug("  Extension: %s\n", extensions->name);
-		extensions->callback(context, extensions,
-							NULL, m, NULL, NULL, 0);
-		extensions++;
+	
+	if (extensions) {
+	    while (extensions->callback) {
+		    debug("  Extension: %s\n", extensions->name);
+		    extensions->callback(context, extensions,
+						NULL, m, NULL, NULL, 0);
+		    extensions++;
+	    }
 	}
 
 	return context;
@@ -3001,16 +3040,30 @@ libwebsockets_fork_service_loop(struct libwebsocket_context *context)
 		return 0;
 	}
 
+#ifdef HAVE_SYS_PRCTL_H
 	/* we want a SIGHUP when our parent goes down */
 	prctl(PR_SET_PDEATHSIG, SIGHUP);
+#endif
 
 	/* in this forked process, sit and service websocket connections */
 
-	while (1)
+	while (1) {
 		if (libwebsocket_service(context, 1000))
-			return -1;
+			break;
+//#ifndef HAVE_SYS_PRCTL_H
+/*
+ * on systems without prctl() (i.e. anything but linux) we can notice that our
+ * parent is dead if getppid() returns 1. FIXME apparently this is not true for
+ * solaris, could remember ppid right after fork and wait for it to change.
+ */
 
-	return 0;
+        if (getppid() == 1)
+            break;
+//#endif
+    }
+
+
+	return 1;
 }
 
 #endif

@@ -12,11 +12,11 @@ LT_INIT(shared)
 #AX_PTHREAD
 
 # Checks for programs.
-AC_PROG_CC
+AM_PROG_CC_C_O
 AC_PROG_INSTALL
 AC_PROG_MAKE_SET
 AC_CONFIG_MACRO_DIR([m4])
-
+AM_PROG_AR
 
 #
 #
@@ -72,6 +72,19 @@ CFLAGS="$CFLAGS -DLWS_EXT_GOOGLE_MUX"
 fi
 AM_CONDITIONAL(EXT_GOOGLE_MUX, test x$x_google_mux = xyes)
 
+#                                                                               
+#                                                                               
+#                                                                               
+AC_ARG_ENABLE(mingw,                                                          
+ [  --enable-mingw  Using mingw compilers, disables ping test build],            
+ [ mingw=yes
+   noping=yes
+ ])                                                                             
+                                                                                
+if test "x$mingw" = "xyes" ; then                                             
+CFLAGS="$CFLAGS -DLWS_MINGW_SUPPORT"                                          
+fi
+AM_CONDITIONAL(MINGW, test x$mingw = xyes)
 
 #
 #
@@ -99,7 +112,7 @@ AM_CONDITIONAL(NOPING, test x$noping = xyes)
 
 
 # Checks for header files.
-AC_CHECK_HEADERS([zlib.h fcntl.h netinet/in.h stdlib.h string.h sys/socket.h unistd.h])
+AC_CHECK_HEADERS([zlib.h fcntl.h netinet/in.h stdlib.h string.h sys/socket.h unistd.h sys/prctl.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_SIZE_T
@@ -114,4 +127,6 @@ AC_CONFIG_FILES([Makefile
                  lib/Makefile
                  test-server/Makefile])
 
-AC_OUTPUT
+AC_OUTPUT([
+libwebsockets.pc
+])

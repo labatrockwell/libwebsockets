@@ -258,7 +258,7 @@ int main(int argc, char **argv)
 
 	context = libwebsocket_create_context(CONTEXT_PORT_NO_LISTEN, NULL,
 				protocols, libwebsocket_internal_extensions,
-							 NULL, NULL, -1, -1, 0);
+							 NULL, NULL, -1, -1, 0, NULL);
 	if (context == NULL) {
 		fprintf(stderr, "Creating libwebsocket context failed\n");
 		return 1;
@@ -286,6 +286,9 @@ int main(int argc, char **argv)
 	n = 0;
 	while (n >= 0 && !was_closed) {
 		n = libwebsocket_service(context, 1000);
+
+		if (n < 0)
+			continue;
 
 		if (wsi_mirror == NULL) {
 

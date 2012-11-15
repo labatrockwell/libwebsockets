@@ -35,13 +35,20 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-@EXT_GOOGLE_MUX_TRUE@am__append_1 = extension-x-google-mux.c
+@EXT_GOOGLE_MUX_TRUE@am__append_1 = extension-x-google-mux.c extension-x-google-mux.h
 @LIBCRYPTO_FALSE@am__append_2 = md5.c sha-1.c
+@MINGW_TRUE@am__append_3 = -w -I../win32port/win32helpers -I ../win32port/zlib/
+@MINGW_TRUE@am__append_4 = -lm -luser32 -ladvapi32 -lkernel32 -lgcc
+@MINGW_FALSE@am__append_5 = -rdynamic -fPIC -Werror
+@MINGW_FALSE@am__append_6 = -version-info 0:3
 subdir = lib
 DIST_COMMON = $(include_HEADERS) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
+	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
+	$(top_srcdir)/m4/ltversion.m4 $(top_srcdir)/m4/lt~obsolete.m4 \
+	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 mkinstalldirs = $(install_sh) -d
@@ -74,8 +81,10 @@ LTLIBRARIES = $(lib_LTLIBRARIES)
 libwebsockets_la_LIBADD =
 am__dist_libwebsockets_la_SOURCES_DIST = libwebsockets.c handshake.c \
 	parsers.c libwebsockets.h base64-decode.c client-handshake.c \
-	extension.c extension-deflate-stream.c private-libwebsockets.h \
-	extension-x-google-mux.c md5.c sha-1.c
+	extension.c extension-deflate-stream.c \
+	extension-deflate-stream.h private-libwebsockets.h \
+	extension-x-google-mux.c extension-x-google-mux.h md5.c \
+	sha-1.c
 @EXT_GOOGLE_MUX_TRUE@am__objects_1 = libwebsockets_la-extension-x-google-mux.lo
 @LIBCRYPTO_FALSE@am__objects_2 = libwebsockets_la-md5.lo \
 @LIBCRYPTO_FALSE@	libwebsockets_la-sha-1.lo
@@ -227,12 +236,12 @@ lib_LTLIBRARIES = libwebsockets.la
 include_HEADERS = libwebsockets.h
 dist_libwebsockets_la_SOURCES = libwebsockets.c handshake.c parsers.c \
 	libwebsockets.h base64-decode.c client-handshake.c extension.c \
-	extension-deflate-stream.c private-libwebsockets.h \
-	$(am__append_1) $(am__append_2)
-libwebsockets_la_CFLAGS := -rdynamic -fPIC -Wall -Werror -std=gnu99 -pedantic -c \
-	-DINSTALL_DATADIR=\"@datadir@\" -DLWS_OPENSSL_CLIENT_CERTS=\"@clientcertdir@\"
-
-libwebsockets_la_LDFLAGS = -lz -version-info 0:3
+	extension-deflate-stream.c extension-deflate-stream.h \
+	private-libwebsockets.h $(am__append_1) $(am__append_2)
+libwebsockets_la_CFLAGS = -Wall -std=gnu99 -pedantic $(am__append_3) \
+	$(am__append_5) -c -DINSTALL_DATADIR=\"@datadir@\" \
+	-DLWS_OPENSSL_CLIENT_CERTS=\"@clientcertdir@\"
+libwebsockets_la_LDFLAGS = $(am__append_4) $(am__append_6) -lz
 all: all-am
 
 .SUFFIXES:

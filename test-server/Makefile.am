@@ -1,18 +1,35 @@
 bin_PROGRAMS=libwebsockets-test-server libwebsockets-test-client libwebsockets-test-server-extpoll libwebsockets-test-fraggle
 libwebsockets_test_server_SOURCES=test-server.c
-libwebsockets_test_server_LDADD=-L../lib -lwebsockets
+libwebsockets_test_server_LDADD=-L../lib -lwebsockets -lz
 libwebsockets_test_client_SOURCES=test-client.c
-libwebsockets_test_client_LDADD=-L../lib -lwebsockets
+libwebsockets_test_client_LDADD=-L../lib -lwebsockets -lz
 libwebsockets_test_server_extpoll_SOURCES=test-server-extpoll.c
-libwebsockets_test_server_extpoll_LDADD=-L../lib -lwebsockets
+libwebsockets_test_server_extpoll_LDADD=-L../lib -lwebsockets -lz
 libwebsockets_test_fraggle_SOURCES=test-fraggle.c
-libwebsockets_test_fraggle_LDADD=-L../lib -lwebsockets
+libwebsockets_test_fraggle_LDADD=-L../lib -lwebsockets -lz
+ 
+if MINGW                                                                        
+libwebsockets_test_server_CFLAGS= -w  -I../win32port/win32helpers
+libwebsockets_test_client_CFLAGS= -w   -I../win32port/win32helpers
+libwebsockets_test_server_extpoll_CFLAGS= -w  -I../win32port/win32helpers
+libwebsockets_test_fraggle_CFLAGS= -w   -I../win32port/win32helpers
 
+libwebsockets_test_server_LDADD+= -lm -luser32 -ladvapi32 -lkernel32 -lgcc -lws2_32 -lz
+libwebsockets_test_client_LDADD+= -lm -luser32 -ladvapi32 -lkernel32 -lgcc -lws2_32 -lz 
+libwebsockets_test_server_extpoll_LDADD+= -lm -luser32 -ladvapi32 -lkernel32 -lgcc -lws2_32 -lz
+libwebsockets_test_fraggle_LDADD+= -lm -luser32 -ladvapi32 -lkernel32 -lgcc -lws2_32 -lz
 
-libwebsockets_test_server_CFLAGS:= -Wall -Werror -std=gnu99 -pedantic -DINSTALL_DATADIR=\"@datadir@\" -DLWS_OPENSSL_CLIENT_CERTS=\"@clientcertdir@\"
-libwebsockets_test_client_CFLAGS:= -Wall -Werror -std=gnu99 -pedantic -DINSTALL_DATADIR=\"@datadir@\" -DLWS_OPENSSL_CLIENT_CERTS=\"@clientcertdir@\"
-libwebsockets_test_server_extpoll_CFLAGS:= -Wall -Werror -std=gnu99 -pedantic -DINSTALL_DATADIR=\"@datadir@\" -DLWS_OPENSSL_CLIENT_CERTS=\"@clientcertdir@\"
-libwebsockets_test_fraggle_CFLAGS:= -Wall -Werror -std=gnu99 -pedantic -DINSTALL_DATADIR=\"@datadir@\" -DLWS_OPENSSL_CLIENT_CERTS=\"@clientcertdir@\"
+else
+libwebsockets_test_server_CFLAGS= -Werror
+libwebsockets_test_client_CFLAGS= -Werror
+libwebsockets_test_server_extpoll_CFLAGS= -Werror
+libwebsockets_test_fraggle_CFLAGS= -Werror
+endif   
+
+libwebsockets_test_server_CFLAGS+= -Wall -std=gnu99 -pedantic -DINSTALL_DATADIR=\"@datadir@\" -DLWS_OPENSSL_CLIENT_CERTS=\"@clientcertdir@\"
+libwebsockets_test_client_CFLAGS+= -Wall -std=gnu99 -pedantic -DINSTALL_DATADIR=\"@datadir@\" -DLWS_OPENSSL_CLIENT_CERTS=\"@clientcertdir@\"
+libwebsockets_test_server_extpoll_CFLAGS+= -Wall -std=gnu99 -pedantic -DINSTALL_DATADIR=\"@datadir@\" -DLWS_OPENSSL_CLIENT_CERTS=\"@clientcertdir@\"
+libwebsockets_test_fraggle_CFLAGS+= -Wall -std=gnu99 -pedantic -DINSTALL_DATADIR=\"@datadir@\" -DLWS_OPENSSL_CLIENT_CERTS=\"@clientcertdir@\"
 
 
 if NOPING
@@ -20,9 +37,10 @@ else
 bin_PROGRAMS+=libwebsockets-test-ping
 libwebsockets_test_ping_SOURCES=test-ping.c
 libwebsockets_test_ping_LDADD=-L../lib -lwebsockets
-libwebsockets_test_ping_CFLAGS:= -Wall -Werror -std=gnu99 -pedantic -DINSTALL_DATADIR=\"@datadir@\" -DLWS_OPENSSL_CLIENT_CERTS=\"@clientcertdir@\"
+libwebsockets_test_ping_CFLAGS= -Wall -Werror -std=gnu99 -pedantic -DINSTALL_DATADIR=\"@datadir@\" -DLWS_OPENSSL_CLIENT_CERTS=\"@clientcertdir@\"
 endif
 
+EXTRA_DIST=test.html favicon.ico
 
 #
 # cook a random test cert and key

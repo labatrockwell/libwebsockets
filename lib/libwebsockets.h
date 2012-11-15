@@ -24,6 +24,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+#include <cstddef>
 #endif
 
 #ifdef WIN32
@@ -33,6 +34,7 @@ extern "C" {
 #endif
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <stddef.h>
 #include "../win32port/win32helpers/websock-w32.h"
 
 #include "../win32port/win32helpers/gettimeofday.h"
@@ -63,6 +65,7 @@ typedef int ssize_t;
 enum libwebsocket_context_options {
 	LWS_SERVER_OPTION_DEFEAT_CLIENT_MASK = 1,
 	LWS_SERVER_OPTION_REQUIRE_VALID_OPENSSL_CLIENT_CERT = 2,
+	LWS_SERVER_OPTION_SKIP_SERVER_CANONICAL_NAME = 4,
 };
 
 enum libwebsocket_callback_reasons {
@@ -577,7 +580,7 @@ libwebsocket_create_context(int port, const char * interf,
 		  struct libwebsocket_extension *extensions,
 		  const char *ssl_cert_filepath,
 		  const char *ssl_private_key_filepath, int gid, int uid,
-		  unsigned int options);
+		  unsigned int options, void *user);
 
 LWS_EXTERN void
 libwebsocket_context_destroy(struct libwebsocket_context *context);
@@ -591,6 +594,9 @@ libwebsocket_service(struct libwebsocket_context *context, int timeout_ms);
 LWS_EXTERN int
 libwebsocket_service_fd(struct libwebsocket_context *context,
 							 struct pollfd *pollfd);
+
+LWS_EXTERN void *
+libwebsocket_context_user(struct libwebsocket_context *context);
 
 /*
  * IMPORTANT NOTICE!
